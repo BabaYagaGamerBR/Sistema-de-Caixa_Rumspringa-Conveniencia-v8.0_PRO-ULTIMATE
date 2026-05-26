@@ -2880,5 +2880,101 @@ if(typeof window.dadosCliente === 'function'){
 console.log('Correções de segurança V8.0 aplicadas: apagar venda, editar/excluir cliente e taxas protegidas por ADM.');
 </script>
 
+
+<script>
+/* ====== CORREÇÃO PONTUAL: BACKUP LOCAL INCLUI USUÁRIOS/OPERADORES ====== */
+function validarUsuariosBackupLocal(lista){
+    return Array.isArray(lista) && lista.length > 0 && lista.some(u =>
+        u &&
+        String(u.nome || '').trim() &&
+        String(u.senha || '').trim() &&
+        String(u.perfil || '').trim() === 'admin'
+    );
+}
+
+function getUsuariosBackupLocalSeguro(){
+    try{
+        const u = JSON.parse(localStorage.getItem('usuariosSistema') || '[]');
+        if(validarUsuariosBackupLocal(u)) return u;
+    }catch(e){}
+    if(typeof getUsuarios === 'function') return getUsuarios();
+    return [];
+}
+
+window.backup = function(){
+    const hoje = new Date();
+    const nomeData = `${pad2(hoje.getDate())}-${pad2(hoje.getMonth()+1)}-${hoje.getFullYear()}`;
+    const nomeArquivo = `BKP System Rumspringa ${nomeData}.json`;
+
+    if(typeof recarregarDB === 'function') recarregarDB();
+
+    const backupCompleto = {
+        produtos: JSON.parse(localStorage.getItem('produtos') || '[]'),
+        clientes: JSON.parse(localStorage.getItem('clientes') || '[]'),
+        vendas: JSON.parse(localStorage.getItem('vendas') || '[]'),
+        pagamentosFiado: JSON.parse(localStorage.getItem('pagamentosFiado') || '[]'),
+        retiradas: JSON.parse(localStorage.getItem('retiradas') || '[]'),
+        fechamentos: JSON.parse(localStorage.getItem('fechamentos') || '[]'),
+        config: JSON.parse(localStorage.getItem('config') || '{"deb":2,"cred":4}'),
+        iniciais: JSON.parse(localStorage.getItem('iniciais') || '{}'),
+        audit: JSON.parse(localStorage.getItem('audit') || '[]'),
+        configExtra: JSON.parse(localStorage.getItem('configExtra') || '{}'),
+        usuariosSistema: getUsuariosBackupLocalSeguro(),
+        backupGeradoEm: new Date().toISOString()
+    };
+
+    const a = document.createElement('a');
+    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupCompleto, null, 2));
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    if(typeof log === 'function') log('Backup baixado', `Arquivo: ${nomeArquivo} • Inclui usuários/operadores`);
+};
+
+window.restore = function(inp){
+    const file = inp && inp.files ? inp.files[0] : null;
+    if(!file) return;
+
+    const r = new FileReader();
+    r.onload = e => {
+        try{
+            if(confirm('Restaurar backup? Isso substituirá os dados atuais do sistema.')) {
+                const d = JSON.parse(e.target.result);
+
+                localStorage.setItem('produtos', JSON.stringify(d.produtos || []));
+                localStorage.setItem('vendas', JSON.stringify(d.vendas || []));
+                localStorage.setItem('pagamentosFiado', JSON.stringify(d.pagamentosFiado || []));
+                localStorage.setItem('clientes', JSON.stringify(d.clientes || []));
+                localStorage.setItem('retiradas', JSON.stringify(d.retiradas || []));
+                localStorage.setItem('config', JSON.stringify(d.config || {deb:2, cred:4}));
+                localStorage.setItem('iniciais', JSON.stringify(d.iniciais || {}));
+                localStorage.setItem('audit', JSON.stringify(d.audit || []));
+                localStorage.setItem('fechamentos', JSON.stringify(d.fechamentos || []));
+                localStorage.setItem('configExtra', JSON.stringify(d.configExtra || {}));
+
+                if(d.usuariosSistema !== undefined){
+                    if(!validarUsuariosBackupLocal(d.usuariosSistema)){
+                        alert('Backup contém usuários inválidos ou sem administrador. A restauração foi bloqueada para evitar perda de acesso.');
+                        return;
+                    }
+                    localStorage.setItem('usuariosSistema', JSON.stringify(d.usuariosSistema));
+                } else {
+                    alert('Backup antigo sem usuários/operadores. Os usuários atuais deste aparelho serão mantidos.');
+                }
+
+                alert('Backup restaurado com sucesso.');
+                location.reload();
+            }
+        }catch(err){
+            console.error(err);
+            alert('Erro ao restaurar backup. Verifique se o arquivo JSON é válido.');
+        }
+    };
+    r.readAsText(file);
+};
+</script>
+
 </body>
 </html>
