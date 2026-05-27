@@ -153,7 +153,7 @@ Todo o sistema funciona localmente no navegador, proporcionando:
 
 * velocidade;
 * privacidade;
-* controle total dos dados;
+* controle total dos dados ;
 * independência operacional.
 
 ---
